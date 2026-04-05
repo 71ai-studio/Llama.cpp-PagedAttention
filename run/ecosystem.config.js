@@ -32,18 +32,19 @@ const common = {
 module.exports = {
   apps: [
 
-    // ── Q4_K_M — Khuyến nghị: full/partial GPU ──────────────────────────
+    // ── Q4_K_M — hybrid GPU+CPU (RTX 3060 12GB: ~48/64 layers)  ─────────
     {
       ...common,
       name: "q4km",
       env: {
+        ...common.env,
         LLAMA_MODEL:        "Qwen3.5-27B-Q4_K_M.gguf",
-        LLAMA_PORT:         "11434",          // cùng port Ollama
+        LLAMA_PORT:         "11434",
         LLAMA_HOST:         "0.0.0.0",
         LLAMA_CTX:          "8192",
         LLAMA_PARALLEL:     "4",
         LLAMA_KV_PAGE_SIZE: "16",
-        LLAMA_NGL:          "99",             // Q4_K_M ~16.7GB: thử full GPU
+        // LLAMA_NGL không set → auto_ngl.py tính tự động từ VRAM free
       },
     },
 
@@ -52,13 +53,14 @@ module.exports = {
       ...common,
       name: "q5km",
       env: {
+        ...common.env,
         LLAMA_MODEL:        "Qwen3.5-27B-Q5_K_M.gguf",
         LLAMA_PORT:         "11435",
         LLAMA_HOST:         "0.0.0.0",
         LLAMA_CTX:          "8192",
-        LLAMA_PARALLEL:     "2",              // ít slot hơn vì model lớn
+        LLAMA_PARALLEL:     "2",
         LLAMA_KV_PAGE_SIZE: "16",
-        LLAMA_NGL:          "28",             // ~19.6GB: hybrid
+        // LLAMA_NGL không set → auto_ngl.py tính tự động
       },
     },
 
@@ -67,13 +69,14 @@ module.exports = {
       ...common,
       name: "q6k",
       env: {
+        ...common.env,
         LLAMA_MODEL:        "Qwen_Qwen3.5-27B-Q6_K.gguf",
         LLAMA_PORT:         "11436",
         LLAMA_HOST:         "0.0.0.0",
         LLAMA_CTX:          "4096",
         LLAMA_PARALLEL:     "2",
         LLAMA_KV_PAGE_SIZE: "16",
-        LLAMA_NGL:          "28",
+        // LLAMA_NGL không set → auto_ngl.py tính tự động
       },
     },
 
@@ -82,13 +85,14 @@ module.exports = {
       ...common,
       name: "q4km-flat",
       env: {
+        ...common.env,
         LLAMA_MODEL:        "Qwen3.5-27B-Q4_K_M.gguf",
         LLAMA_PORT:         "11437",
-        LLAMA_HOST:         "127.0.0.1",      // internal only
+        LLAMA_HOST:         "127.0.0.1",
         LLAMA_CTX:          "8192",
         LLAMA_PARALLEL:     "4",
-        LLAMA_KV_PAGE_SIZE: "0",              // flat KV
-        LLAMA_NGL:          "99",
+        LLAMA_KV_PAGE_SIZE: "0",
+        // LLAMA_NGL không set → auto_ngl.py tính tự động
       },
     },
 

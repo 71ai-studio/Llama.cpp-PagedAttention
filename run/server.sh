@@ -25,8 +25,9 @@ if [ -n "${LLAMA_NGL:-}" ]; then
 else
     MODEL_PATH_TMP="$MODELS_DIR/$MODEL_FILE"
     if [ -f "$MODEL_PATH_TMP" ] && command -v python3 &>/dev/null; then
-        NGL=$(python3 "$SCRIPT_DIR/auto_ngl.py" "$MODEL_PATH_TMP" 1500 2>/dev/null || echo "$NGL_AUTO")
-        echo "[server] Auto NGL: $NGL layers (calculated from VRAM)"
+        # Reserve 2500MB: 1500MB model overhead + ~1000MB compute buffers
+        NGL=$(python3 "$SCRIPT_DIR/auto_ngl.py" "$MODEL_PATH_TMP" 2500 2>/dev/null || echo "$NGL_AUTO")
+        echo "[server] Auto NGL: $NGL layers (calculated from VRAM, reserve=2500MB)"
     else
         NGL="$NGL_AUTO"
     fi
@@ -45,12 +46,12 @@ fi
 # Paged KV cache bắt buộc dùng CPU RAM (offload_kqv=false) và pre-allocate
 # toàn bộ n_ctx slots ngay lúc khởi động → phải kiểm soát n_ctx.
 if [ "${KV_PAGE_SIZE:-0}" -gt 0 ] && command -v python3 &>/dev/null; then
+    # verbose output → stderr (PM2 error log), số kết quả → stdout (captured)
     CAPPED_CTX=$(python3 "$SCRIPT_DIR/kv_ctx_limit.py" \
         "$MODEL_PATH" "$CONTEXT_SIZE" \
         --limit "$KV_RAM_LIMIT" \
         --ram-type available \
-        --verbose \
-        2>&1 | tee /dev/stderr | tail -1)
+        --verbose)
 
     # Chỉ dùng giá trị nếu là số hợp lệ
     if [[ "$CAPPED_CTX" =~ ^[0-9]+$ ]] && [ "$CAPPED_CTX" -gt 0 ]; then
@@ -86,11 +87,10 @@ ARGS=(
     --n-gpu-layers "$NGL"
     --threads      "$N_THREADS"
     --parallel     "$N_PARALLEL"
-    --flash-attn
+    --flash-attn    on
     --kv-page-size "$KV_PAGE_SIZE"
     --cont-batching                  # continuous batching
     --metrics                        # expose /metrics endpoint
-    --log-format    text
 )
 
 # Paged KV cache yêu cầu kv_unified; flat mode không cần nhưng không hại
