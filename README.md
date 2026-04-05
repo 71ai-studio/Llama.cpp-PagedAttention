@@ -2,7 +2,8 @@
 
 **Base commit:** `f49e91787`
 **Cập nhật:** 2026-04-05
-**Tác giả:** vuna
+**Thực hiện:** Vu Nguyen Anh
+**Email:** vuna.aid@gmail.com
 
 ---
 
