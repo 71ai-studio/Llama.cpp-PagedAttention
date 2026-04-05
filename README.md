@@ -9,6 +9,16 @@
 
 ## Changelog — Fixes & Improvements (2026-04-05)
 
+### Distributed auto-join (mới nhất)
+
+| Thêm mới | File | Chi tiết |
+|----------|------|---------|
+| Worker tự đăng ký | `run/distributed_coordinator.py` | `POST /api/workers/register` — VM mới gửi host+port; coordinator lưu registry, check TCP, restart llama-server với `--rpc` mới sau 5s debounce |
+| Thông tin cluster | `run/distributed_coordinator.py` | `GET /api/info` — expose `model_file`, `hf_repo` để worker mới biết cần tải model gì; `--model-file` CLI arg |
+| Script 1-lệnh join | `run/worker_join.sh` | VM mới chạy 1 lệnh: auto-detect IP, query `/api/info`, start `llama-rpc-server`, đăng ký với coordinator |
+| RPC list động | `run/server.sh` | Đọc `LLAMA_RPC_WORKERS` env (set bởi coordinator trước restart) hoặc fallback đọc `workers_registry.json` để build `--rpc` arg |
+| Coordinator PM2 | `run/ecosystem.config.js` | Thêm app `coordinator` (port 11433) — start cùng `q4km` bằng 1 lệnh |
+
 ### Build scripts
 
 | Fix | File | Chi tiết |
@@ -439,7 +449,81 @@ build:
   # hoặc brew install ./homebrew/llama-paged-kv.rb
 ```
 
-### 6.3 Setup cluster (script tự động)
+### 6.3 Auto-join — VM mới tự động vào cluster
+
+Cơ chế chính: khi chỉ có 1 VM, hệ thống chạy bình thường (không cần `--rpc`). Khi thêm VM mới, chỉ cần chạy **1 lệnh** trên VM đó:
+
+```
+1 VM ban đầu:
+  ┌──────────────────────────────────┐
+  │  coordinator :11433 (PM2)        │  ← nhận requests từ client
+  │  llama-server :11434 (PM2 q4km)  │  ← chạy không có --rpc
+  └──────────────────────────────────┘
+
++ VM mới join:
+  VM mới chạy: ./run/worker_join.sh --coordinator http://vm1:11433
+                      │
+          ┌───────────▼────────────────────────────┐
+          │ 1. Query /api/info → lấy model_file     │
+          │ 2. Tải model (nếu --also-download-model)│
+          │ 3. Start llama-rpc-server :50052        │
+          │ 4. POST /api/workers/register           │
+          └────────────────────────────────────────┘
+                      │
+       coordinator nhận đăng ký:
+          ┌───────────▼────────────────────────────┐
+          │ 5. Kiểm tra TCP vm2:50052 OK           │
+          │ 6. Lưu workers_registry.json           │
+          │ 7. Sau 5s debounce: pm2 restart q4km   │
+          │    với --rpc vm2:50052                 │
+          └────────────────────────────────────────┘
+
+Kết quả:
+  ┌──────────────────────────────────┐
+  │  coordinator :11433              │
+  │  llama-server :11434             │
+  │    --rpc vm2:50052               │  ← vm2 cung cấp compute offload
+  └──────────────────────────────────┘
+          vm2: llama-rpc-server :50052
+```
+
+**Chạy trên VM chính** (chỉ cần 1 lần):
+```bash
+# Start cả llama-server + coordinator cùng lúc
+pm2 start run/ecosystem.config.js --only q4km
+pm2 start run/ecosystem.config.js --only coordinator
+
+# Hoặc start tất cả cùng lúc
+pm2 start run/ecosystem.config.js
+```
+
+**Chạy trên VM mới** (bất kỳ lúc nào):
+```bash
+# Clone repo và build trước
+git clone <repo> && cd Llama.cpp-PagedAttention
+./build.sh  # cần GGML_RPC=ON
+
+# Join cluster
+./run/worker_join.sh --coordinator http://192.168.1.10:11433
+
+# Nếu VM mới cũng muốn chạy standalone (tải model về):
+./run/worker_join.sh --coordinator http://192.168.1.10:11433 --also-download-model
+```
+
+**Kiểm tra workers hiện tại:**
+```bash
+curl http://localhost:11433/api/workers
+curl http://localhost:11433/api/info
+curl http://localhost:11433/coordinator/status
+```
+
+**Remove worker khỏi cluster:**
+```bash
+curl -X DELETE http://localhost:11433/api/workers/192.168.1.11
+# coordinator sẽ restart llama-server không còn --rpc vm đó
+```
+
+### 6.5 Setup cluster thủ công (nodes.json)
 
 ```bash
 # 1. Cấu hình nodes.json
@@ -468,7 +552,7 @@ curl http://localhost:11433/v1/chat/completions \
   -d '{"model":"local","messages":[{"role":"user","content":"Hello"}]}'
 ```
 
-### 6.4 deploy.sh — tự động trên từng máy
+### 6.6 deploy.sh — tự động trên từng máy
 
 ```bash
 # Trên mỗi node (Ubuntu hoặc macOS), script tự:
@@ -489,7 +573,7 @@ curl http://localhost:11433/v1/chat/completions \
 ./deploy.sh --config run/nodes.json --self 192.168.1.10 --pull --rebuild
 ```
 
-### 6.5 Bandwidth và latency thực tế
+### 6.7 Bandwidth và latency thực tế
 
 ```
 Network       Bandwidth   RPC latency/token   Khuyến nghị
@@ -511,24 +595,32 @@ RPC overhead tổng = (n_workers × latency) per forward pass
 # Tải models
 ./run/download_models.sh
 
-# Setup và start
+# Setup và start (PM2)
 ./run/pm2_setup.sh
+
+# Hoặc start thủ công
+pm2 start run/ecosystem.config.js --only q4km        # chỉ llama-server
+pm2 start run/ecosystem.config.js --only coordinator  # thêm coordinator/proxy
 
 # Quản lý
 pm2 list
 pm2 logs q4km
+pm2 logs coordinator
 pm2 monit
 pm2 restart q4km
 ```
 
-| PM2 Name | Model | Port | KV Mode | ngl |
-|---|---|:-:|:-:|:-:|
-| `q4km` | Q4_K_M (15.6GB) | 11434 | paged-16 | auto |
-| `q4km-flat` | Q4_K_M | 11437 | flat | auto |
-| `q5km` | Q5_K_M (8.7GB split) | 11435 | paged-16 | auto |
-| `q6k` | Q6_K (21.5GB) | 11436 | paged-16 | auto |
+| PM2 Name | Vai trò | Port | Model / Config | ngl |
+|---|---|:-:|---|:-:|
+| `q4km` | llama-server | 11434 | Q4_K_M, paged-16, 4 slots | auto |
+| `q5km` | llama-server | 11435 | Q5_K_M, paged-16, 2 slots | auto |
+| `q6k` | llama-server | 11436 | Q6_K, paged-16, 2 slots | auto |
+| `q4km-flat` | llama-server (benchmark) | 11437 | Q4_K_M, flat KV, 4 slots | auto |
+| `coordinator` | proxy + worker registry | 11433 | route → q4km, auto-join API | — |
 
 > **NGL auto-detect:** `auto_ngl.py` tính từ VRAM free với reserve=2500MB (dự phòng compute buffers). Override bằng `LLAMA_NGL=N` trong ecosystem.config.js nếu cần.
+
+> **Coordinator:** Nhận requests tại `:11433` (OpenAI-compatible), proxy tới `llama-server :11434`. Khi có worker VM đăng ký → tự restart `q4km` với `--rpc worker:50052`. Client nên gọi port `11433` thay vì `11434` trực tiếp.
 
 ---
 
