@@ -1,0 +1,66 @@
+{
+  "_comment": "Cluster config cho distributed llama.cpp inference (RPC backend)",
+  "_doc": "Mỗi node chạy: ./deploy.sh --config run/nodes.json --self <host>",
+
+  "cluster_name": "llama-cluster",
+
+  "model":        "Qwen3.5-27B-Q4_K_M.gguf",
+  "context":      8192,
+  "kv_page_size": 16,
+  "n_parallel":   4,
+
+  "nodes": [
+    {
+      "_comment": "Main node: chạy llama-server, kết nối tới workers qua RPC",
+      "role":       "main",
+      "host":       "192.168.1.10",
+      "ssh_user":   "ubuntu",
+      "gpu_layers": 20,
+      "port":       11434,
+      "rpc_port":   null,
+      "platform":   "linux-cuda",
+      "gpu":        "RTX 3060 12GB"
+    },
+    {
+      "_comment": "Worker 1: GPU server, cung cấp backend layers qua RPC",
+      "role":       "worker",
+      "host":       "192.168.1.11",
+      "ssh_user":   "ubuntu",
+      "gpu_layers": 22,
+      "port":       null,
+      "rpc_port":   50052,
+      "platform":   "linux-cuda",
+      "gpu":        "RTX 3090 24GB"
+    },
+    {
+      "_comment": "Worker 2: CPU-only fallback worker",
+      "role":       "worker",
+      "host":       "192.168.1.12",
+      "ssh_user":   "ubuntu",
+      "gpu_layers": 0,
+      "port":       null,
+      "rpc_port":   50053,
+      "platform":   "linux-cpu",
+      "gpu":        "none"
+    },
+    {
+      "_comment": "macOS worker: Apple Silicon Metal",
+      "role":       "worker",
+      "host":       "192.168.1.13",
+      "ssh_user":   "mac",
+      "gpu_layers": 99,
+      "port":       null,
+      "rpc_port":   50054,
+      "platform":   "macos",
+      "gpu":        "Apple M2 Pro 32GB"
+    }
+  ],
+
+  "_notes": {
+    "gpu_layers=0":  "CPU-only; auto-detected từ VRAM nếu = 0 và model tồn tại",
+    "rpc_port":      "Worker lắng nghe TCP port này; main kết nối tới host:rpc_port",
+    "port":          "Main server HTTP port (OpenAI-compatible API)",
+    "kv_page_size":  "0 = flat KV, 8/16/32 = paged KV với prefix caching",
+    "platform":      "linux-cuda | linux-cpu | macos (thông tin, không dùng để auto-detect)"
+  }
+}

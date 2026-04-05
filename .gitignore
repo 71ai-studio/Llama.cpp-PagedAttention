@@ -1,0 +1,31 @@
+# Models (too large for git)
+models/
+*.gguf
+*.ggml
+
+# Build artifacts
+llama-cpp-python/vendor/llama.cpp/build/
+build/
+*.o
+*.a
+*.so
+*.dll
+*.dylib
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+.venv/
+venv/
+
+# Logs
+*.log
+run/results/
+
+# Editor
+.DS_Store
+.idea/
+.vscode/

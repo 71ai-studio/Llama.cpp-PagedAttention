@@ -1,0 +1,101 @@
+[
+  {
+    "name": "q6k-flat-cpu",
+    "desc": "Q6_K, Flat KV, CPU-only (baseline hiện tại)",
+    "model": "Qwen_Qwen3.5-27B-Q6_K.gguf",
+    "fa": 1,
+    "kv_page_size": 0,
+    "ngl": 0,
+    "n_prompt": 128,
+    "n_gen": 32,
+    "reps": 3
+  },
+  {
+    "name": "q6k-flat-gpu28",
+    "desc": "Q6_K, Flat KV, 28 layers GPU",
+    "model": "Qwen_Qwen3.5-27B-Q6_K.gguf",
+    "fa": 1,
+    "kv_page_size": 0,
+    "ngl": 28,
+    "n_prompt": 128,
+    "n_gen": 32,
+    "reps": 3
+  },
+  {
+    "name": "q6k-paged16-gpu28",
+    "desc": "Q6_K, Paged KV page_size=16, 28 layers GPU",
+    "model": "Qwen_Qwen3.5-27B-Q6_K.gguf",
+    "fa": 1,
+    "kv_page_size": 16,
+    "ngl": 28,
+    "n_prompt": 128,
+    "n_gen": 32,
+    "reps": 3
+  },
+  {
+    "name": "q4km-flat-gpu99",
+    "desc": "Q4_K_M (~16.7GB), Flat KV, full GPU",
+    "model": "Qwen3.5-27B-Q4_K_M.gguf",
+    "fa": 1,
+    "kv_page_size": 0,
+    "ngl": 99,
+    "n_prompt": 128,
+    "n_gen": 32,
+    "reps": 3
+  },
+  {
+    "name": "q4km-flat-gpu28",
+    "desc": "Q4_K_M, Flat KV, 28 layers GPU",
+    "model": "Qwen3.5-27B-Q4_K_M.gguf",
+    "fa": 1,
+    "kv_page_size": 0,
+    "ngl": 28,
+    "n_prompt": 128,
+    "n_gen": 32,
+    "reps": 3
+  },
+  {
+    "name": "q4km-paged16-gpu99",
+    "desc": "Q4_K_M, Paged KV page_size=16, full GPU",
+    "model": "Qwen3.5-27B-Q4_K_M.gguf",
+    "fa": 1,
+    "kv_page_size": 16,
+    "ngl": 99,
+    "n_prompt": 128,
+    "n_gen": 32,
+    "reps": 3
+  },
+  {
+    "name": "q4km-paged32-gpu99",
+    "desc": "Q4_K_M, Paged KV page_size=32, full GPU",
+    "model": "Qwen3.5-27B-Q4_K_M.gguf",
+    "fa": 1,
+    "kv_page_size": 32,
+    "ngl": 99,
+    "n_prompt": 128,
+    "n_gen": 32,
+    "reps": 3
+  },
+  {
+    "name": "q5km-flat-gpu28",
+    "desc": "Q5_K_M (~19.6GB), Flat KV, 28 layers GPU",
+    "model": "Qwen3.5-27B-Q5_K_M.gguf",
+    "fa": 1,
+    "kv_page_size": 0,
+    "ngl": 28,
+    "n_prompt": 128,
+    "n_gen": 32,
+    "reps": 3
+  },
+  {
+    "name": "q5km-paged16-gpu28",
+    "desc": "Q5_K_M, Paged KV page_size=16, 28 layers GPU",
+    "model": "Qwen3.5-27B-Q5_K_M.gguf",
+    "fa": 1,
+    "kv_page_size": 16,
+    "ngl": 28,
+    "n_prompt": 128,
+    "n_gen": 32,
+    "reps": 3
+  }
+]
