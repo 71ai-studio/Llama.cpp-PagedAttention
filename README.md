@@ -7,6 +7,57 @@
 
 ---
 
+## Changelog — Fixes & Improvements (2026-04-05)
+
+### Build scripts
+
+| Fix | File | Chi tiết |
+|-----|------|---------|
+| Hardcode `/home/vuna` | `build.sh`, `run/bench_gpu.sh`, `run/download_models.sh`, `run/pm2_setup.sh` | Thay `SCRIPT_DIR` cho tất cả path — scripts chạy đúng từ bất kỳ thư mục nào |
+
+### Server startup (`run/server.sh`)
+
+| Fix | Chi tiết |
+|-----|---------|
+| `--flash-attn` thiếu value | Flag này yêu cầu giá trị explicit trong version mới: đổi thành `--flash-attn on` |
+| `--log-format text` không còn tồn tại | Flag đã bị xóa khỏi llama-server — loại bỏ |
+| `--kv-unified` luôn được thêm | Chỉ thêm khi `kv_page_size > 0` (paged mode yêu cầu); flat mode không cần |
+| VRAM reserve quá thấp → OOM | Tăng reserve từ `1500 MB` → `2500 MB` khi tính NGL để dự phòng compute buffers (~1 GB) ngoài model weights |
+| `tee /dev/stderr` crash trong PM2 | PM2 redirect stderr sang log file → `/dev/stderr` không phải device. Fix: verbose output tự nhiên vào stderr, `$(...)` chỉ capture stdout |
+
+### Ecosystem / PM2 config (`run/ecosystem.config.js`)
+
+| Fix | Chi tiết |
+|-----|---------|
+| `LLAMA_NGL: "99"` hardcode → CUDA OOM | Xóa override NGL cứng — để `auto_ngl.py` tính tự động từ VRAM free mỗi lần start |
+| `LLAMA_NGL: "28"` cho Q5/Q6 | Xóa — auto-detect chính xác hơn giá trị cứng |
+| `env` không kế thừa `common.env` | Thêm `...common.env` spread vào từng app để inherit `LLAMA_KV_RAM_LIMIT` |
+
+### RAM management — Paged KV cache
+
+**Vấn đề:** Paged KV cache bắt buộc chạy trên CPU RAM (`offload_kqv=false` khi `kv_page_size > 0`) và pre-allocate buffer đầy đủ ngay lúc khởi động. Với nhiều instances chạy song song, RAM bị cạn kiệt gây treo VM.
+
+| Thêm mới | File | Chi tiết |
+|----------|------|---------|
+| RAM limit cho paged KV | `run/kv_ctx_limit.py` | Đọc GGUF metadata (n_layers, n_kv_heads, head_dim), đo RAM available, tính `max_ctx = (RAM × limit) / kv_bytes_per_token`, cap `n_ctx` nếu vượt ngưỡng |
+| Tự động giới hạn ctx | `run/server.sh` | Gọi `kv_ctx_limit.py` trước khi start; log rõ khi ctx bị giảm |
+| Export RAM info | `run/detect_hw.sh` | Export `TOTAL_RAM_MB` và `AVAIL_RAM_MB` |
+| Default limit 80% | `run/ecosystem.config.js` | `LLAMA_KV_RAM_LIMIT=0.80`; override per-instance nếu cần |
+
+**Công thức RAM paged KV:**
+```
+KV_RAM = n_ctx × n_layers × 2 × n_kv_heads × head_dim × elem_bytes
+Qwen3.5-27B (8192 ctx): 8192 × 64 × 2 × 4 × 128 × 2 ≈ 1 GB trên CPU RAM
+```
+
+**Biến điều chỉnh:**
+```bash
+LLAMA_KV_RAM_LIMIT=0.80   # default: 80% RAM available
+LLAMA_KV_RAM_LIMIT=0.50   # giảm xuống 50% khi chạy nhiều instances
+```
+
+---
+
 ## Tổng quan
 
 Dự án mở rộng llama.cpp với ba lớp cải tiến:
@@ -238,16 +289,20 @@ cparams.kv_page_size    = 16;  // 0=flat, 8/16/32=paged
 
 ### CLI
 ```bash
-# Single node — paged KV
+# Single node — paged KV (--flash-attn yêu cầu value explicit)
 llama-server \
   --model models/Qwen3.5-27B-Q4_K_M.gguf \
-  --flash-attn \
+  --flash-attn on \
   --kv-page-size 16 \
-  --n-gpu-layers 48 \
+  --kv-unified \
+  --n-gpu-layers 43 \
+  --ctx-size 8192 \
+  --parallel 4 \
+  --cont-batching \
   --port 11434
 
 # Benchmark
-llama-bench -m model.gguf -fa 1 --kv-page-size 16 -ngl 48 -p 128 -n 32 -r 3
+llama-bench -m model.gguf -fa 1 --kv-page-size 16 -ngl 43 -p 128 -n 32 -r 3
 ```
 
 ### Python
@@ -468,10 +523,12 @@ pm2 restart q4km
 
 | PM2 Name | Model | Port | KV Mode | ngl |
 |---|---|:-:|:-:|:-:|
-| `q4km` | Q4_K_M (15.6GB) | 11434 | paged-16 | 48 |
-| `q4km-flat` | Q4_K_M | 11437 | flat | 48 |
-| `q5km` | Q5_K_M (19.6GB) | 11435 | paged-16 | 34 |
-| `q6k` | Q6_K (21.5GB) | 11436 | paged-16 | 34 |
+| `q4km` | Q4_K_M (15.6GB) | 11434 | paged-16 | auto |
+| `q4km-flat` | Q4_K_M | 11437 | flat | auto |
+| `q5km` | Q5_K_M (8.7GB split) | 11435 | paged-16 | auto |
+| `q6k` | Q6_K (21.5GB) | 11436 | paged-16 | auto |
+
+> **NGL auto-detect:** `auto_ngl.py` tính từ VRAM free với reserve=2500MB (dự phòng compute buffers). Override bằng `LLAMA_NGL=N` trong ecosystem.config.js nếu cần.
 
 ---
 
