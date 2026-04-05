@@ -26,7 +26,7 @@ BUILD_BIN="$SCRIPT_DIR/../llama-cpp-python/vendor/llama.cpp/build/bin"
 if [ ! -f "$BUILD_BIN/llama-server" ]; then
     echo ""
     echo "[!] llama-server chưa được build."
-    echo "    Chạy: /home/vuna/llama.cpp/build.sh"
+    echo "    Chạy: $SCRIPT_DIR/../build.sh"
     echo "    Sau đó chạy lại script này."
     exit 1
 fi

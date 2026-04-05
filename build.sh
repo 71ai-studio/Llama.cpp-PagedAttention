@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SRC_DIR="~/llama.cpp/llama-cpp-python/vendor/llama.cpp"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SRC_DIR="$SCRIPT_DIR/llama-cpp-python/vendor/llama.cpp"
 BUILD_DIR="$SRC_DIR/build"
-LOG_FILE="~/llama.cpp/build_$(date +%Y%m%d_%H%M%S).log"
+LOG_FILE="$SCRIPT_DIR/build_$(date +%Y%m%d_%H%M%S).log"
 
 export PATH="/usr/local/cuda/bin:$PATH"
 export LD_LIBRARY_PATH="/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"

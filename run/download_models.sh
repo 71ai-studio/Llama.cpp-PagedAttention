@@ -3,7 +3,10 @@
 # Chỉ tải nếu file chưa tồn tại
 set -euo pipefail
 
-MODELS_DIR="~/llama.cpp/models"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MODELS_DIR="$SCRIPT_DIR/../models"
+
 HF_REPO="unsloth/Qwen3.5-27B-GGUF"
 BASE_URL="https://huggingface.co/${HF_REPO}/resolve/main"
 

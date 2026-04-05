@@ -2,10 +2,10 @@
 # bench_gpu.sh — benchmark hybrid GPU+CPU (không chạy full CPU)
 set -euo pipefail
 
-BIN=~/llama.cpp/llama-cpp-python/vendor/llama.cpp/build/bin
-Q4=~/llama.cpp/models/Qwen3.5-27B-Q4_K_M.gguf
-Q6=~/llama.cpp/models/Qwen_Qwen3.5-27B-Q6_K.gguf
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BIN="$SCRIPT_DIR/../llama-cpp-python/vendor/llama.cpp/build/bin"
+Q4="$SCRIPT_DIR/../models/Qwen3.5-27B-Q4_K_M.gguf"
+Q6="$SCRIPT_DIR/../models/Qwen_Qwen3.5-27B-Q6_K.gguf"
 RESULTS=$SCRIPT_DIR/results
 
 mkdir -p "$RESULTS"
