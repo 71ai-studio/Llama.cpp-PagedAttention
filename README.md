@@ -589,7 +589,92 @@ RPC overhead tổng = (n_workers × latency) per forward pass
 
 ---
 
-## 7. Deployment đơn giản (single node, PM2)
+## 7. WebUI — Quản lý cluster qua trình duyệt
+
+Web interface local để quản lý toàn bộ cluster: start/stop processes, xem workers, tail logs realtime, test inference, theo dõi VRAM.
+
+### 7.1 Tính năng
+
+| Tab | Nội dung |
+|---|---|
+| **Dashboard** | Status card PM2 apps, GPU (VRAM, temp, util, power), RAM/CPU system |
+| **Processes** | Start/Stop/Restart từng app, xem LLAMA_* env vars, restart counter |
+| **Workers** | Danh sách RPC workers (healthy/unreachable), thêm/xoá thủ công |
+| **Logs** | Live tail PM2 logs qua SSE, filter errors only, auto-scroll |
+| **Inference** | Chat UI test nhanh → coordinator, streaming, hiện tok/s |
+| **Metrics** | VRAM history chart, active requests, avg latency, raw Prometheus |
+
+### 7.2 Cài đặt và chạy
+
+#### Ubuntu / Debian
+```bash
+# 1. Cài dependencies
+pip install fastapi uvicorn psutil aiohttp
+
+# 2. Chạy WebUI
+python3 run/webui.py
+# → Mở trình duyệt: http://localhost:7860
+
+# Hoặc qua PM2 (tự động start cùng cluster)
+pm2 start run/ecosystem.config.js --only webui
+pm2 logs webui
+```
+
+#### macOS
+```bash
+# Cài Python (nếu chưa có)
+brew install python3
+
+# Cài dependencies
+pip3 install fastapi uvicorn psutil aiohttp
+
+# Chạy
+python3 run/webui.py
+# → http://localhost:7860
+```
+
+#### Windows
+```powershell
+# Mở PowerShell (hoặc Windows Terminal)
+
+# Cài dependencies
+pip install fastapi uvicorn psutil aiohttp
+
+# Chạy (từ thư mục project)
+python run\webui.py
+
+# Hoặc chỉ định coordinator/server tùy chỉnh
+python run\webui.py --coordinator http://192.168.1.10:11433 --llama-server http://192.168.1.10:11434
+
+# → Mở trình duyệt: http://localhost:7860
+```
+
+> **Lưu ý Windows:** nvidia-smi phải có trong PATH (`C:\Windows\System32\DriverStore\FileRepository\...`).
+> PM2 không hỗ trợ Windows native — dùng trực tiếp `python run\webui.py`.
+
+### 7.3 Tùy chọn CLI
+
+```
+python3 run/webui.py [OPTIONS]
+
+  --port PORT              Port WebUI (default: 7860)
+  --host HOST              Bind host (default: 127.0.0.1 — chỉ local)
+                           Dùng 0.0.0.0 nếu muốn truy cập từ máy khác
+  --coordinator URL        URL coordinator (default: http://127.0.0.1:11433)
+  --llama-server URL       URL llama-server (default: http://127.0.0.1:11434)
+```
+
+Ví dụ — quản lý cluster trên VM từ xa:
+```bash
+# Trên máy local, SSH port-forward rồi mở WebUI
+ssh -L 7860:localhost:7860 -L 11433:localhost:11433 user@vm-ip
+python3 run/webui.py  # trên VM
+# → Truy cập http://localhost:7860 trên máy local
+```
+
+---
+
+## 8. Deployment đơn giản (single node, PM2)
 
 ```bash
 # Tải models
@@ -617,6 +702,7 @@ pm2 restart q4km
 | `q6k` | llama-server | 11436 | Q6_K, paged-16, 2 slots | auto |
 | `q4km-flat` | llama-server (benchmark) | 11437 | Q4_K_M, flat KV, 4 slots | auto |
 | `coordinator` | proxy + worker registry | 11433 | route → q4km, auto-join API | — |
+| `webui` | Web management UI | 7860 | http://localhost:7860 | — |
 
 > **NGL auto-detect:** `auto_ngl.py` tính từ VRAM free với reserve=2500MB (dự phòng compute buffers). Override bằng `LLAMA_NGL=N` trong ecosystem.config.js nếu cần.
 

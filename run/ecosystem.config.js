@@ -97,6 +97,18 @@ module.exports = {
       },
     },
 
+    // ── WebUI — quản lý cluster qua trình duyệt ─────────────────────────
+    // Truy cập: http://localhost:7860
+    {
+      ...common,
+      name:        "webui",
+      script:      `${BASE_DIR}/webui.py`,
+      interpreter: "python3",
+      args:        "--port 7860 --host 127.0.0.1",
+      max_restarts: 10,
+      min_uptime:   "5s",
+    },
+
     // ── Coordinator — proxy + worker registry ────────────────────────────
     // Nhận requests tại :11433, proxy tới llama-server :11434
     // Worker mới join qua: POST http://this-vm:11433/api/workers/register
