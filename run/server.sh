@@ -16,12 +16,14 @@ SERVER_HOST="${LLAMA_HOST:-0.0.0.0}"
 CONTEXT_SIZE="${LLAMA_CTX:-8192}"
 N_PARALLEL="${LLAMA_PARALLEL:-4}"
 KV_PAGE_SIZE="${LLAMA_KV_PAGE_SIZE:-16}"
+# KV_RAM_LIMIT: tỉ lệ RAM tối đa dành cho paged KV cache (default: 80%)
+KV_RAM_LIMIT="${LLAMA_KV_RAM_LIMIT:-0.80}"
 
 # Auto-detect max NGL nếu không được override
 if [ -n "${LLAMA_NGL:-}" ]; then
     NGL="$LLAMA_NGL"
 else
-    MODEL_PATH_TMP="$SCRIPT_DIR/../models/$MODEL_FILE"
+    MODEL_PATH_TMP="$MODELS_DIR/$MODEL_FILE"
     if [ -f "$MODEL_PATH_TMP" ] && command -v python3 &>/dev/null; then
         NGL=$(python3 "$SCRIPT_DIR/auto_ngl.py" "$MODEL_PATH_TMP" 1500 2>/dev/null || echo "$NGL_AUTO")
         echo "[server] Auto NGL: $NGL layers (calculated from VRAM)"
@@ -39,6 +41,28 @@ if [ ! -f "$MODEL_PATH" ]; then
     exit 1
 fi
 
+# ── Paged KV: giới hạn CONTEXT_SIZE để KV cache không vượt quá KV_RAM_LIMIT ──
+# Paged KV cache bắt buộc dùng CPU RAM (offload_kqv=false) và pre-allocate
+# toàn bộ n_ctx slots ngay lúc khởi động → phải kiểm soát n_ctx.
+if [ "${KV_PAGE_SIZE:-0}" -gt 0 ] && command -v python3 &>/dev/null; then
+    CAPPED_CTX=$(python3 "$SCRIPT_DIR/kv_ctx_limit.py" \
+        "$MODEL_PATH" "$CONTEXT_SIZE" \
+        --limit "$KV_RAM_LIMIT" \
+        --ram-type available \
+        --verbose \
+        2>&1 | tee /dev/stderr | tail -1)
+
+    # Chỉ dùng giá trị nếu là số hợp lệ
+    if [[ "$CAPPED_CTX" =~ ^[0-9]+$ ]] && [ "$CAPPED_CTX" -gt 0 ]; then
+        if [ "$CAPPED_CTX" -lt "$CONTEXT_SIZE" ]; then
+            echo "[server] KV RAM limit (${KV_RAM_LIMIT}): ctx ${CONTEXT_SIZE} → ${CAPPED_CTX}"
+        fi
+        CONTEXT_SIZE="$CAPPED_CTX"
+    else
+        echo "[server] WARN: kv_ctx_limit trả về không hợp lệ ('$CAPPED_CTX') — dùng ctx gốc $CONTEXT_SIZE"
+    fi
+fi
+
 # ── Log thông tin khởi động ───────────────────────────────────────────────
 echo "========================================================"
 echo "  llama-server (paged KV edition)"
@@ -50,6 +74,7 @@ echo "  threads  : $N_THREADS"
 echo "  ctx      : $CONTEXT_SIZE tokens"
 echo "  parallel : $N_PARALLEL slots"
 echo "  kv-page  : $KV_PAGE_SIZE"
+echo "  kv-limit : ${KV_RAM_LIMIT} × RAM available"
 echo "========================================================"
 
 # ── Build args ────────────────────────────────────────────────────────────
@@ -68,8 +93,10 @@ ARGS=(
     --log-format    text
 )
 
-# Flash attn yêu cầu kv_unified
-ARGS+=(--kv-unified)
+# Paged KV cache yêu cầu kv_unified; flat mode không cần nhưng không hại
+if [ "${KV_PAGE_SIZE:-0}" -gt 0 ]; then
+    ARGS+=(--kv-unified)
+fi
 
 # macOS Metal: thêm flag riêng
 if [ "$GPU_TYPE" = "metal" ]; then

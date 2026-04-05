@@ -77,6 +77,15 @@ else
     N_THREADS=$(nproc --ignore=2 2>/dev/null || echo 4)
 fi
 
+# ── System RAM ────────────────────────────────────────────────────────────
+if [ "$OS" = "Darwin" ]; then
+    TOTAL_RAM_MB=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1024 / 1024 ))
+    AVAIL_RAM_MB=$TOTAL_RAM_MB  # macOS: xấp xỉ bằng total (unified memory)
+else
+    TOTAL_RAM_MB=$(awk '/^MemTotal:/{print int($2/1024)}' /proc/meminfo 2>/dev/null || echo 0)
+    AVAIL_RAM_MB=$(awk '/^MemAvailable:/{print int($2/1024)}' /proc/meminfo 2>/dev/null || echo 0)
+fi
+
 # ── Export ────────────────────────────────────────────────────────────────
 export LLAMA_BIN
 export GPU_TYPE
@@ -85,8 +94,12 @@ export NGL_AUTO
 export N_THREADS
 export OS
 export ARCH
+export TOTAL_RAM_MB
+export AVAIL_RAM_MB
 
 echo "[detect_hw] llama-server : $LLAMA_BIN"
 echo "[detect_hw] GPU type     : $GPU_TYPE"
 echo "[detect_hw] ngl auto     : $NGL_AUTO"
 echo "[detect_hw] threads      : $N_THREADS"
+echo "[detect_hw] RAM total    : ${TOTAL_RAM_MB} MB"
+echo "[detect_hw] RAM avail    : ${AVAIL_RAM_MB} MB"

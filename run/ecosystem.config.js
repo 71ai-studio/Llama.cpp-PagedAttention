@@ -22,6 +22,11 @@ const common = {
   autorestart: true,
   log_date_format: "YYYY-MM-DD HH:mm:ss",
   merge_logs: true,
+  env: {
+    // Paged KV cache dùng CPU RAM — giới hạn tối đa 80% RAM available
+    // Ghi đè bằng LLAMA_KV_RAM_LIMIT=0.5 nếu cần chạy nhiều instance
+    LLAMA_KV_RAM_LIMIT: "0.80",
+  },
 };
 
 module.exports = {
