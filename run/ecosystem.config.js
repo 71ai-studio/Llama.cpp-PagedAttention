@@ -1,10 +1,11 @@
-// ecosystem.config.js — PM2 config cho llama-server
+// ecosystem.config.js — PM2 config cho llama-server + coordinator
 // Usage:
-//   pm2 start ecosystem.config.js              # start tất cả
-//   pm2 start ecosystem.config.js --only q4km  # start 1 instance
+//   pm2 start ecosystem.config.js                     # start tất cả
+//   pm2 start ecosystem.config.js --only q4km         # chỉ llama-server
+//   pm2 start ecosystem.config.js --only coordinator  # chỉ coordinator
 //   pm2 stop all
 //   pm2 restart q4km
-//   pm2 logs q4km
+//   pm2 logs coordinator
 //   pm2 monit
 
 const BASE_DIR = __dirname;
@@ -94,6 +95,24 @@ module.exports = {
         LLAMA_KV_PAGE_SIZE: "0",
         // LLAMA_NGL không set → auto_ngl.py tính tự động
       },
+    },
+
+    // ── Coordinator — proxy + worker registry ────────────────────────────
+    // Nhận requests tại :11433, proxy tới llama-server :11434
+    // Worker mới join qua: POST http://this-vm:11433/api/workers/register
+    // Khi có worker mới → tự restart q4km với --rpc worker:50052
+    {
+      ...common,
+      name:        "coordinator",
+      script:      `${BASE_DIR}/distributed_coordinator.py`,
+      interpreter: "python3",
+      args:        "--server-pm2-name q4km --port 11433 --model-file Qwen3.5-27B-Q4_K_M.gguf",
+      env: {
+        LLAMA_MODEL: "Qwen3.5-27B-Q4_K_M.gguf",
+      },
+      // coordinator không restart theo cơ chế llama-server
+      max_restarts: 10,
+      min_uptime:   "5s",
     },
 
   ],

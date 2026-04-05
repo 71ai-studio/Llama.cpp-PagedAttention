@@ -1,0 +1,4 @@
+{
+  "_comment": "Auto-managed by coordinator.py — workers tự đăng ký qua /api/workers/register",
+  "workers": []
+}

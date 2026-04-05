@@ -64,6 +64,20 @@ if [ "${KV_PAGE_SIZE:-0}" -gt 0 ] && command -v python3 &>/dev/null; then
     fi
 fi
 
+# ── RPC workers: đọc từ env (set bởi coordinator) hoặc registry ─────────
+RPC_LIST="${LLAMA_RPC_WORKERS:-}"
+if [ -z "$RPC_LIST" ] && [ -f "$SCRIPT_DIR/workers_registry.json" ] && command -v python3 &>/dev/null; then
+    RPC_LIST=$(python3 -c "
+import json, sys
+try:
+    data = json.load(open('$SCRIPT_DIR/workers_registry.json'))
+    healthy = [w for w in data.get('workers', []) if w.get('healthy')]
+    print(','.join(f\"{w['host']}:{w['rpc_port']}\" for w in healthy))
+except:
+    pass
+" 2>/dev/null || echo "")
+fi
+
 # ── Log thông tin khởi động ───────────────────────────────────────────────
 echo "========================================================"
 echo "  llama-server (paged KV edition)"
@@ -76,6 +90,7 @@ echo "  ctx      : $CONTEXT_SIZE tokens"
 echo "  parallel : $N_PARALLEL slots"
 echo "  kv-page  : $KV_PAGE_SIZE"
 echo "  kv-limit : ${KV_RAM_LIMIT} × RAM available"
+echo "  rpc      : ${RPC_LIST:-(none — single VM mode)}"
 echo "========================================================"
 
 # ── Build args ────────────────────────────────────────────────────────────
@@ -106,6 +121,11 @@ fi
 # CPU-only: tắt offload
 if [ "$GPU_TYPE" = "none" ] || [ "$NGL" -eq 0 ]; then
     ARGS+=(--no-kv-offload)
+fi
+
+# RPC workers (khi có worker VM đã đăng ký)
+if [ -n "${RPC_LIST:-}" ]; then
+    ARGS+=(--rpc "$RPC_LIST")
 fi
 
 # ── Chạy server ───────────────────────────────────────────────────────────
