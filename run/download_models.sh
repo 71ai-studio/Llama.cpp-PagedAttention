@@ -3,7 +3,7 @@
 # Chỉ tải nếu file chưa tồn tại
 set -euo pipefail
 
-MODELS_DIR="/home/vuna/llama.cpp/models"
+MODELS_DIR="~/llama.cpp/models"
 HF_REPO="unsloth/Qwen3.5-27B-GGUF"
 BASE_URL="https://huggingface.co/${HF_REPO}/resolve/main"
 
